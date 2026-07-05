@@ -7,55 +7,56 @@ export async function POST(req: NextRequest) {
   try {
     const { shopDomain, accessToken, brandId } = await req.json()
 
-    if (!shopDomain || !accessToken || !brandId) {
-      return NextResponse.json({ error: 'Missing credentials' }, { status: 400 })
-    }
-
-    // 1. Fetch Customers from Shopify
-    const customerRes = await fetch(`https://${shopDomain}/admin/api/2024-01/customers.json`, {
+    // 1. Fetch Customers with Email (Filter added)
+    // Hum specific fields maang rahe hain taaki response clean aaye
+    const customerRes = await fetch(`https://${shopDomain}/admin/api/2024-01/customers.json?fields=id,email,first_name,last_name,orders_count&limit=50`, {
       headers: { 'X-Shopify-Access-Token': accessToken }
     })
+    
     const customersData = await customerRes.json()
+    
+    // Debugging: Console mein dekho kya aa raha hai
+    console.log('Shopify Response:', JSON.stringify(customersData)) 
+
     const customers = customersData.customers || []
+
+    if (customers.length === 0) {
+        return NextResponse.json({ success: true, synced: 0, message: 'No customers found in Shopify store.' })
+    }
 
     let syncedCount = 0
 
-    // 2. Process Each Customer
     for (const customer of customers) {
-      const email = customer.email
-      if (!email) continue
+      // Sirf valid emails wale customers lo
+      if (!customer.email) continue;
 
-      // Check if buyer already exists
+      // Check duplicate
       const { data: existingBuyer } = await supabase
         .from('buyers')
-        .select('id, total_drops_purchased')
-        .eq('primary_email', email)
+        .select('id')
+        .eq('primary_email', customer.email)
         .eq('brand_id', brandId)
         .single()
 
-      if (existingBuyer) {
-        // Update existing buyer's drop count based on order history if needed
-        // For now, we assume webhook handles new orders, this is just for initial presence
-        continue 
-      }
+      if (existingBuyer) continue; // Skip if already exists
 
-      // Calculate Tier based on historical orders (Simplified logic for sync)
-      // In real sync, you'd fetch their orders too. Here we default to Bronze or check order_count
-      const totalOrders = customer.orders_count || 0
-      const tier = calculateTier(totalOrders) 
+      // Tier Calculation (Simple logic for sync)
+      const orders = customer.orders_count || 0;
+      let tier = 'Bronze';
+      if (orders >= 5) tier = 'Gold';
+      else if (orders >= 3) tier = 'Silver';
 
-      // Insert New Buyer
-      await supabase.from('buyers').insert({
+      // Insert into DB
+      const { error } = await supabase.from('buyers').insert({
         brand_id: brandId,
-        full_name: `${customer.first_name} ${customer.last_name}`.trim(),
-        primary_email: email,
-        phone_number: customer.phone || null,
+        full_name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Customer',
+        primary_email: customer.email,
         current_tier: tier,
-        total_drops_purchased: totalOrders,
-        last_order_date: customer.last_order_id ? new Date().toISOString() : null // Placeholder date
+        total_drops_purchased: orders,
+        last_order_date: new Date().toISOString() // Placeholder for sync
       })
 
-      syncedCount++
+      if (!error) syncedCount++;
     }
 
     return NextResponse.json({ success: true, synced: syncedCount })
