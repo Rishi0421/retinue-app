@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 import { 
   ArrowLeft, Save, Globe, Trophy, Bell, Loader2, 
-  Store, Mail, Trash2, AlertTriangle, CheckCircle2 
+  Store, Mail, Trash2, AlertTriangle, CheckCircle2, RefreshCw
 } from 'lucide-react'
 
 export default function SettingsPage() {
@@ -14,6 +14,52 @@ export default function SettingsPage() {
   const [successMsg, setSuccessMsg] = useState('')
   const [brandId, setBrandId] = useState<string | null>(null)
   
+  const [syncing, setSyncing] = useState(false)
+  const [syncStatus, setSyncStatus] = useState('')
+  const [manualToken, setManualToken] = useState('') // Temporary input for testing
+
+  const handleSyncShopify = async () => {
+    if (!brandId) return;
+    
+    // Validation
+    const tokenToUse = manualToken || process.env.NEXT_PUBLIC_SHOPIFY_ACCESS_TOKEN; 
+    // Note: In production, never expose tokens in env on client side. 
+    // For now, we rely on user input or a secure backend session.
+    
+    if (!tokenToUse) {
+      setSyncStatus('Please enter Shopify Access Token first.');
+      return;
+    }
+
+    setSyncing(true);
+    setSyncStatus('Connecting to Shopify...');
+
+    try {
+      const res = await fetch('/api/sync-shopify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shopDomain: 'retinue-test-store.myshopify.com', // Dynamic hona chahiye future mein
+          accessToken: tokenToUse,
+          brandId: brandId
+        })
+      });
+
+      const data = await res.json();
+      
+      if (data.success) {
+        setSyncStatus(`✅ Success! Synced ${data.synced} customers.`);
+        setTimeout(() => window.location.reload(), 2000); // Auto refresh after 2s
+      } else {
+        setSyncStatus(`❌ Error: ${data.error}`);
+      }
+    } catch (err) {
+      setSyncStatus(' Network error. Check console.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   // Form State
   const [config, setConfig] = useState({
     currency: 'INR',
@@ -220,6 +266,43 @@ export default function SettingsPage() {
               <input type="checkbox" checked={config.enableNotifications} onChange={(e) => setConfig({...config, enableNotifications: e.target.checked})} className="w-5 h-5 text-indigo-600 rounded" />
             </label>
           </div>
+        </div>
+
+        {/* Data Sync Section */}
+        <div className="bg-white p-6 rounded-xl border shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-purple-100 rounded-lg"><RefreshCw className="w-5 h-5 text-purple-600" /></div>
+            <h2 className="font-bold text-lg text-slate-900">Historical Data Sync</h2>
+          </div>
+          <p className="text-sm text-slate-500 mb-4">
+            Import your existing customers and calculate their tiers based on past orders. 
+            This may take a few minutes for large stores.
+          </p>
+          {/* Input Field for Testing Token */}
+          <div className="mb-4">
+            <label className="block text-xs font-medium text-slate-500 mb-1">Shopify Admin API Token (For Testing)</label>
+            <input 
+              type="password" 
+              value={manualToken}
+              onChange={(e) => setManualToken(e.target.value)}
+              placeholder="shpua_xxxxxxxxxxxx"
+              className="w-full bg-slate-50 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">Get this from Shopify Admin &gt; Apps &gt; Develop Apps &gt; Your App &gt; Admin API integration</p>
+          </div>
+
+          <button 
+            onClick={handleSyncShopify}
+            disabled={syncing}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm disabled:opacity-50"
+          >
+            {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {syncing ? 'Syncing Store...' : 'Sync Historical Data'}
+          </button>
+          
+          {syncStatus && (
+            <p className="mt-3 text-sm text-emerald-600 font-medium">{syncStatus}</p>
+          )}
         </div>
 
         {/* ⚠️ Danger Zone */}
