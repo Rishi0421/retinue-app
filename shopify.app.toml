@@ -1,0 +1,20 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "9874fe456dfa362aa8950be387615e21"
+name = "Retinue"
+application_url = "https://unabrogable-tierra-earthborn.ngrok-free.dev"
+embedded = true
+
+[webhooks]
+api_version = "2026-07"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_customers,read_orders,read_products"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://unabrogable-tierra-earthborn.ngrok-free.dev/api/auth/callback"
+]
