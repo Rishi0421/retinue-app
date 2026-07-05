@@ -3,12 +3,12 @@ import { supabase } from '@/lib/supabaseClient'
 import { Users, Building2, Activity, ShieldCheck, Mail, Trophy, Store } from 'lucide-react'
 
 interface Buyer {
-  id: string | number;
+  id: string;
   full_name: string | null;
   primary_email: string;
   current_tier: string;
   total_drops_purchased: number;
-  brand_id?: string; // Assuming you have this link
+  brand_id?: string;
 }
 
 interface Brand {
@@ -19,11 +19,18 @@ interface Brand {
 }
 
 export default async function Home() {
-  // Fetch Brands
-  const { data: brands } = await supabase.from('brands').select('*')
+  // ✅ Fetch Brands (Newest First)
+  const { data: brands } = await supabase
+    .from('brands')
+    .select('*')
+    .order('created_at', { ascending: false })
   
-  // Fetch Recent Buyers (Across all brands)
-  const { data: buyers } = await supabase.from('buyers').select('*').order('created_at', { ascending: false }).limit(10)
+  // ✅ Fetch Recent Buyers (Across all brands)
+  const { data: buyers } = await supabase
+    .from('buyers')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(10)
 
   const stats = [
     { label: 'Total Brands', value: brands?.length || 0, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-100' },
@@ -67,7 +74,7 @@ export default async function Home() {
           ))}
         </div>
 
-        {/* Registered Brands Section (NEW) */}
+        {/* Registered Brands Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
             <div>
